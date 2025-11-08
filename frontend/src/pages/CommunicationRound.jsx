@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
+
 import ReadAndSpeakRound from "../components/ReadAndSpeakRound";
 import ListenAndSpeakRound from "../components/ListenAndSpeakRound";
 import TopicAndSpeakRound from "../components/TopicAndSpeakRound";
 import CommunicationLogin from "../components/CommunicationLogin";
-import sendEmailComm from "../components/CommunicationEmail";
+import sendProgressEmail from "../components/NextroundEmail";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import apiClient from "../lib/apiClient";
+import { BACKEND_URL, FRONTEND_URL } from "../lib/config";
 
 const CommunicationRound = () => {
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
   const [currentRound, setCurrentRound] = useState(1);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [roundData, setRoundData] = useState(null);
@@ -22,7 +24,6 @@ const CommunicationRound = () => {
   });
   const userId = localStorage.getItem("userId");
   const navigate = useNavigate();
-  const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL
 
   useEffect(() => {
     fetchRoundData();
@@ -39,11 +40,8 @@ const CommunicationRound = () => {
     try {
       setLoading(true);
       setError(null);
-
-      const response = await fetch(`${BACKEND_URL}/getCommunication/${userId}`);
-      const result = await response.json();
-
-      if (!result.success) {
+      const { data: result } = await apiClient.get(`/getCommunication/${userId}`);
+      if (!result?.success) {
         throw new Error("Failed to fetch round data");
       }
 
@@ -58,7 +56,6 @@ const CommunicationRound = () => {
   };
 
   const handleRoundComplete = (roundNumber, score) => {
-    // Ensure score is a valid number
     const validScore = Number.isNaN(score) ? 0 : Math.max(0, Math.min(100, score));
     
     setScores((prev) => ({
@@ -73,19 +70,16 @@ const CommunicationRound = () => {
 
   const calculateTotalScore = () => {
     const { round1, round2, round3 } = scores;
-    // Ensure all scores are valid numbers
     const validScores = [round1, round2, round3].map(score => 
       Number.isNaN(score) ? 0 : Math.max(0, Math.min(100, score))
     );
     
-    // Calculate average and round to nearest integer
     const average = validScores.reduce((a, b) => a + b, 0) / validScores.length;
     return Math.round(average);
   };
 
   const handleSubmit = async () => {
     try {
-      // Check if all rounds are completed
       if (currentRound < 3) {
         alert("Please complete all rounds before submitting.");
         return;
@@ -95,7 +89,6 @@ const CommunicationRound = () => {
       console.log("Scores breakdown:", scores);
       console.log("Total Score:", totalScore);
 
-      // Validate required data
       const userId = localStorage.getItem('userId');
       const candidateEmail = localStorage.getItem('candidateEmail');
       
@@ -103,7 +96,6 @@ const CommunicationRound = () => {
         throw new Error("Missing required user information");
       }
 
-      // Prepare payload
       const payload = {
         userId,
         score: totalScore,
@@ -116,19 +108,21 @@ const CommunicationRound = () => {
         }
       };
 
-      // Send score to backend
-      const scoreResponse = await axios.post(`${BACKEND_URL}/addScore`, payload);
+      const scoreResponse = await apiClient.post(`/addScore`, payload);
 
       if (scoreResponse.data.success) {
-        // Prepare email template params
+        const Round = "techRound";
         const templateParams = {
-          companyName: localStorage.getItem('name'),
+          company_name: localStorage.getItem('name'),
           to_email: candidateEmail,
-          link: `${FRONTEND_URL}/techRound`
+          roundName: "Technical Round",
+          Round,
+          tech_link: `${FRONTEND_URL}/${Round}`,
+          user_id: localStorage.getItem('userId')
         };
 
-        // Send email
-        await sendEmailComm(templateParams);
+        // Send email via common progress email utility
+        await sendProgressEmail(templateParams);
         
         setShowCompletionModal(true);
         setTimeout(() => {

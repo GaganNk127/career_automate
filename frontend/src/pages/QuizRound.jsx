@@ -1,7 +1,6 @@
 import axios from "axios";
 import { useRef, useEffect, useState } from "react";
 import sendProgressEmail from "../components/NextroundEmail";
-import sendRejectionEmail from "../components/RejectionEmail";
 import "../index.css";
 import * as faceapi from "face-api.js";
 
@@ -251,7 +250,7 @@ const QuizComponent = () => {
 
   const fetchUserInfo = async () => {
     try {
-      const userId = userid;
+      const userId = (userid || "").trim();
       if (!userId) {
         console.error("No userId found in localStorage.");
         return;
@@ -286,8 +285,14 @@ const QuizComponent = () => {
 
     try {
       setLoading(true);
+      const cleanUserId = (userid || "").trim();
+      if (!cleanUserId) {
+        setError("Secret Key (userId) is required to start the quiz.");
+        setLoading(false);
+        return;
+      }
       const response = await axios.get(`${BACKEND_URL}/getQuiz`, {
-        params: { userId: userid },
+        params: { userId: cleanUserId },
       });
       console.log("Quiz Responses : ", response);
       setExistingQuizzes(response.data);
@@ -361,23 +366,30 @@ const QuizComponent = () => {
         score,
       });
 
-      const templateParams = {
-        subject: "Congratulations! You're Invited to the Communication Round",
-        candidate_name: name,
-        user_id: localStorage.getItem("userId"),
-        hr_email: hremail,
-        roundName: "Communication Round",
-        tech_link: `${FRONTEND_URL}/communicationRound`,
-        company_name: companyName,
-        to_email: userEmail,
-        recipient_address: email,
-      };
-
-      try {
-        await sendProgressEmail(templateParams);
-        console.log("Email sent successfully!");
-      } catch (emailError) {
-        console.error("Failed to send email:", emailError);
+      // Send emails based on pass/fail against passing marks
+      const passed = Number(score) >= Number(passingMarks);
+      if (passed) {
+        const Round = "communicationRound";
+        const templateParams = {
+          subject: "Congratulations! You're Invited to the Communication Round",
+          candidate_name: name,
+          user_id: localStorage.getItem("userId"),
+          hr_email: hremail,
+          roundName: "Communication Round",
+          Round,
+          tech_link: `${FRONTEND_URL}/${Round}`,
+          company_name: companyName,
+          to_email: userEmail,
+          recipient_address: email,
+        };
+        try {
+          await sendProgressEmail(templateParams);
+          console.log("Progress email sent successfully!");
+        } catch (emailError) {
+          console.error("Failed to send progress email:", emailError);
+        }
+      } else {
+        // Reverted: no rejection email send here
       }
 
       setIsSubmittingQuiz(false)

@@ -58,19 +58,33 @@ router.post("/updateUser", async (req, res) => {
     if (techTime) user.techTime = techTime;
     if (hrTime) user.hrTime = hrTime;
 
-    // Check aptitude results
-    if (score !== undefined) {
-      if (!user.aptitudePassesCandidates.includes(userEmail)) {
+    // Check aptitude results against passing marks when score provided
+    if (score !== undefined && userEmail) {
+      const passMark = user.aptitudePassingMarks ?? 0;
+      const passed = Number(score) >= Number(passMark);
+      // Remove from both lists first to ensure idempotency
+      user.aptitudePassesCandidates = user.aptitudePassesCandidates.filter((e) => e !== userEmail);
+      user.aptitudeFailedCandidates = user.aptitudeFailedCandidates.filter((e) => e !== userEmail);
+      if (passed) {
         user.aptitudePassesCandidates.push(userEmail);
+      } else {
+        user.aptitudeFailedCandidates.push(userEmail);
       }
     }
 
-    // Check technical results if technicalScore is provided
-    if (technicalScore !== undefined) {
-      if (!user.techPassesCandidates.includes(userEmail)) {
+    // Check technical results against passing marks when technicalScore provided
+    if (technicalScore !== undefined && userEmail) {
+      const techPassMark = user.technicalPassingMarks ?? 0;
+      const didPassTech = Number(technicalScore) >= Number(techPassMark);
+      // Remove from both lists first to ensure idempotency
+      user.techPassesCandidates = user.techPassesCandidates.filter((e) => e !== userEmail);
+      user.techFailedCandidates = user.techFailedCandidates.filter((e) => e !== userEmail);
+      if (didPassTech) {
         user.techPassesCandidates.push(userEmail);
-        techPass = true;
+      } else {
+        user.techFailedCandidates.push(userEmail);
       }
+      techPass = didPassTech;
     }
 
     // Update email if provided

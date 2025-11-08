@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import apiClient from "../lib/apiClient";
 import {
   Mail,
   AlertTriangle,
@@ -206,8 +207,7 @@ const StatsCard = ({ candidates }) => {
   const stats = {
     total: candidates.length,
     cheating: candidates.filter((c) => c.isCheating).length,
-    aptitudePassed: candidates.filter((c) => c.aptitudeStatus === "Passed")
-      .length,
+    aptitudePassed: candidates.filter((c) => c.aptitudeStatus === "Passed").length,
     techPassed: candidates.filter((c) => c.techStatus === "Passed").length,
   };
 
@@ -238,7 +238,7 @@ const StatsCard = ({ candidates }) => {
             <div
               className={`ml-2 ${stat.color} text-white text-xs px-2 py-1 rounded-full`}
             >
-              {((stat.value / stats.total) * 100).toFixed(1)}%
+              {stats.total > 0 ? ((stat.value / stats.total) * 100).toFixed(1) : "0.0"}%
             </div>
           </div>
         </div>
@@ -405,12 +405,12 @@ const RecruitmentDashboard = () => {
   const [isLoadingScores, setIsLoadingScores] = useState(false);
   const [scoreError, setScoreError] = useState(null);
 
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+  // Use centralized API client baseURL
 
   const fetchJobs = async () => {
     try {
-      const jobsResponse = await axios.get(`${BACKEND_URL}/jobs/${userId}`);
-      setJobs(jobsResponse.data);
+      const { data } = await apiClient.get(`/jobs/${userId}`);
+      setJobs(data);
     } catch (error) {
       console.error("Error fetching jobs:", error);
     }
@@ -450,9 +450,7 @@ const RecruitmentDashboard = () => {
   const handleDeleteJob = async (jobId) => {
     if (window.confirm("Are you sure you want to delete this job posting?")) {
       try {
-        const response = await axios.delete(`${BACKEND_URL}/deleteJob`, {
-          data: { jobId },
-        });
+        const response = await apiClient.delete(`/deleteJob`, { data: { jobId } });
 
         if (response.status === 200) {
           setJobs(jobs.filter((job) => job._id !== jobId));
@@ -480,26 +478,24 @@ const RecruitmentDashboard = () => {
           return;
         }
 
-        const response = await axios.get(
-          `${BACKEND_URL}/getUserInfo/${userId}`
-        );
-        setRecruiterInfo(response.data);
+        const { data } = await apiClient.get(`/getUserInfo/${userId}`);
+        setRecruiterInfo(data);
 
-        const enrichedCandidates = response.data.candidateData.map(
+        const enrichedCandidates = data.candidateData.map(
           (candidate) => ({
             ...candidate,
-            aptitudeStatus: response.data.aptitudePassesCandidates.includes(
+            aptitudeStatus: data.aptitudePassesCandidates.includes(
               candidate.email
             )
               ? "Passed"
-              : response.data.aptitudeFailedCandidates.includes(candidate.email)
+              : data.aptitudeFailedCandidates.includes(candidate.email)
                 ? "Failed"
                 : "Pending",
-            techStatus: response.data.techPassesCandidates.includes(
+            techStatus: data.techPassesCandidates.includes(
               candidate.email
             )
               ? "Passed"
-              : response.data.techFailedCandidates.includes(candidate.email)
+              : data.techFailedCandidates.includes(candidate.email)
                 ? "Failed"
                 : "Pending",
             hrStatus: "Pending",
@@ -569,29 +565,19 @@ const RecruitmentDashboard = () => {
 
   useEffect(() => {
     const fetchScores = async () => {
-      const userId = localStorage.getItem('userId')
+      const userId = localStorage.getItem('userId');
 
       setIsLoadingScores(true);
       setScoreError(null);
 
-      console.log("fetch scores")
-
       try {
-        const response = await fetch(`${BACKEND_URL}/allScores/${userId}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch scores');
-        }
-
-        console.log("data: ", data)
-
+        const { data } = await apiClient.get(`/allScores/${userId}`);
         // Convert array of scores to object keyed by candidateEmail for easier lookup
-        const scoresMap = data.reduce((acc, scoreData) => {
+        const scoresMap = (data || []).reduce((acc, scoreData) => {
           acc[scoreData.candidateEmail] = {
             aptitudeScore: scoreData.aptitudeScore,
             communicationScore: scoreData.communicationScore,
-            technicalScore: scoreData.technicalScore
+            technicalScore: scoreData.technicalScore,
           };
           return acc;
         }, {});

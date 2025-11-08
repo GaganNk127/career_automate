@@ -4,27 +4,48 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 const cors = require("cors");
 
-app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-const corsOptions = {
-  origin: [
-    "*",
-    "http://localhost:5173",
-  ], // for quick testing purpose included this hardcoded urls
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "multipart/form-data"],
-};
-app.use(cors(corsOptions));
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim().replace(/\/+$/g, ""));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow server-to-server and tools without Origin
+      if (!origin) return callback(null, true);
+
+      const normalize = (o) => (o || "").toString().trim().replace(/\/+$/g, "");
+      const o1 = normalize(origin);
+      const o2 = normalize(origin.replace("127.0.0.1", "localhost"));
+      const o3 = normalize(origin.replace("localhost", "127.0.0.1"));
+
+      // Wildcard support when credentials is false; here credentials is true, so only allow if explicitly set
+      const hasWildcard = allowedOrigins.some((o) => o === "*");
+      const isAllowed = hasWildcard || allowedOrigins.includes(o1) || allowedOrigins.includes(o2) || allowedOrigins.includes(o3);
+
+      if (isAllowed) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 // Connect to MongoDB
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error("MONGO_URI is not set in environment variables");
+  process.exit(1);
+}
 mongoose
-  .connect("mongodb+srv://Gagan:4utBu98LJmkmA1pf@cluster0.cpsyjol.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+  .connect(mongoUri, { autoIndex: true })
   .then(() => {
-    console.log("Database Connected ");
+    console.log("Database Connected");
   })
-  .catch((err) => console.error("Database Connection Failed: ", err));
+  .catch((err) => console.error("Database Connection Failed:", err));
 
 const User = require("./models/userModel");
 
@@ -134,7 +155,7 @@ app.get("/", async (req, res) => {
 });
 
 // Server setup
-const PORT =  3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

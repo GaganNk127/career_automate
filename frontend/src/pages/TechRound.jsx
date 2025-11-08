@@ -11,7 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import axios from "axios";
-import sendHREmail from "../components/HRemail";
+// Email sending reverted: no centralized email client
 
 // Configuration constants
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -192,11 +192,11 @@ const TechRound = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
+        const techUserId = localStorage.getItem("technicalUserId") || userId;
+        if (!techUserId) return;
         const response = await axios.get(`${BACKEND_URL}/getTech`, {
-          params: {
-            userId: userId,
-            headers: { "Content-Type": "application/json" },
-          },
+          params: { userId: techUserId },
+          headers: { "Content-Type": "application/json" },
         });
         const validProblems = response.data.techEntries.filter(
           (problem) => problem && typeof problem === "object" && problem.title
@@ -215,7 +215,7 @@ const TechRound = () => {
     };
 
     fetchProblems();
-  }, []);
+  }, [userId]);
 
   const handleEndSession = async () => {
     try {
@@ -250,20 +250,7 @@ const TechRound = () => {
       const response = await axios.post(`${BACKEND_URL}/updateUser`, userData);
       console.log(response);
 
-      // Handle HR email if user passed
-      const templateParams = {
-        to_email: email,
-        jobRole: jobRole,
-        linkForNextRound: `${FRONTEND_URL}/hrRoundEntrance`,
-        companyName: companyName,
-      };
-
-      try {
-        await sendHREmail(templateParams);
-        console.log("HR email sent successfully");
-      } catch (emailError) {
-        console.error("Failed to send HR email:", emailError);
-      }
+      // Reverted: no automatic HR email send here
 
       alert(
         "Technical round completed successfully. You will receive an email with further instructions."
@@ -366,47 +353,16 @@ const TechRound = () => {
       }
 
       // Update user after submitting all problems
-      handleEndSession();
+      await handleEndSession();
     } catch (error) {
       console.error("Error submitting problems on time expiration:", error);
     }
 
     // You might want to add a modal or redirect logic here
     alert("Technical round time has expired!");
-    handleEndSession();
   };
 
-  useEffect(() => {
-    const fetchProblems = async () => {
-      try {
-        const response = await axios.get(`${BACKEND_URL}/getTech`, {
-          params: { userId: localStorage.getItem("technicalUserId") },
-          headers: { "Content-Type": "application/json" },
-        });
-
-        // Filter out empty problems and ensure we have valid problem objects
-        const validProblems = response.data.techEntries.filter(
-          (problem) => problem && typeof problem === "object" && problem.title
-        );
-
-        setProblems(validProblems);
-        console.log("Tech data: ", validProblems);
-
-        // Initialize code store for all problems
-        const initialCodeStore = {};
-        validProblems.forEach((_, index) => {
-          initialCodeStore[index] = "";
-        });
-        setCodeStore(initialCodeStore);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching tech:", error);
-        setLoading(false);
-      }
-    };
-
-    fetchProblems();
-  }, []);
+  // Removed duplicate fetchProblems effect to avoid double calls
 
   // Update the handleRunCode function
   const handleRunCode = async () => {

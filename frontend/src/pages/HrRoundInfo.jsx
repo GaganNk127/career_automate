@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import sendEmail from "../components/email";
+import sendProgressEmail from "../components/NextroundEmail";
 import axios from "axios";
 
 export default function HRRoundInfo() {
@@ -69,12 +69,9 @@ export default function HRRoundInfo() {
 
     // Determine which test to send based on the available duration
     const duration = aptitudeDuration || technicalDuration;
-    const testType = aptitudeDuration
-      ? "Aptitude Test with Reasoning"
-      : "Technical Test";
-    const testLink = aptitudeDuration
-      ? `${VITE_FRONTEND_URL}/quizRound`
-      : `${VITE_FRONTEND_URL}/techRound`;
+    const Round = aptitudeDuration ? "quizRound" : "techRound";
+    const testType = aptitudeDuration ? "Aptitude/Quiz Round" : "Technical Round";
+    const tech_link = `${VITE_FRONTEND_URL}/${Round}`;
     const subject = `${testType} Invitation for ${companyName}`;
 
     // Function to delay execution for rate limiting
@@ -83,20 +80,19 @@ export default function HRRoundInfo() {
     try {
       for (const email of candidateData) {
         const templateParams = {
-          candidateName: "Candidate", // Since you only have emails, use a generic name
+          candidate_name: "Candidate", // generic name
           user_id: localStorage.getItem("userId"),
-          companyName,
-          dateAndTime: "12th Dec 2024, 10:00 AM", // Example date and time
-          duration: duration || "60", // Use duration from localStorage, or fallback to 60 minutes
-          testLink,
+          company_name: companyName,
+          Round,
+          tech_link,
           hr_email: HRemail,
-          to_email: email, // Send email to the candidate's email
+          to_email: email,
           subject,
           roundName: testType,
         };
 
         try {
-          await sendEmail(templateParams); // Attempt to send the email
+          await sendProgressEmail(templateParams);
           console.log(`Email sent successfully to ${email}`);
         } catch (error) {
           console.error(`Error sending email to ${email}:`, error);

@@ -1,12 +1,17 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const User = require("../models/userModel");
 
 // Route to get user information by userId
 router.get("/getUserInfo/:userId", async (req, res) => {
-  const { userId } = req.params;
+  const userId = (req.params.userId || "").trim();
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid userId format" });
+    }
+
     // Find the user by userId
     const user = await User.findById(userId);
     if (!user) {
